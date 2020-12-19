@@ -32,6 +32,11 @@ namespace LynnaLib
 
         List<byte>[] usedTileList = new List<byte>[256];
 
+        // This is generally a reference to GLib.Idle.Add, but this library doesn't import GLib, so
+        // it's up to the caller to set this to something with the "LazyTileRedraw" function. If
+        // this is null, then tile updates are always fully redrawn before any method here returns.
+        Action<Func<bool>> idleHandlerAdder = null;
+
 
         // Events
 
@@ -332,6 +337,12 @@ namespace LynnaLib
         }
 
 
+        // Call this with a non-null argument (should be like GLib.Idle.Add) to arrange for tile
+        // redraws to be done lazily.
+        public void LazyTileRedraw(Action<Func<bool>> idleHandlerAdder) {
+            this.idleHandlerAdder = idleHandlerAdder;
+        }
+
         // Clear all tile image caches. This is called when certain major fields of the tileset are
         // modified. This will trigger an asynchronous redraw of the tileset image (unless called
         // from the constructor), which is costly.
@@ -343,12 +354,18 @@ namespace LynnaLib
         }
         // Trigger asynchronous redraw of all tiles that are marked as needing to be redrawn
         public void DrawAllTiles() {
-            tileUpdaterIndex = 0;
-            GLib.IdleHandler handler = new GLib.IdleHandler(TileUpdater);
-            GLib.Idle.Add(handler);
+            if (idleHandlerAdder != null) {
+                tileUpdaterIndex = 0;
+                idleHandlerAdder(TileUpdater);
+            }
+            else {
+                for (int i=0; i < 256; i++) {
+                    GetTileImage(i);
+                }
+            }
         }
 
-        int tileUpdaterIndex;
+        int tileUpdaterIndex = 256;
 
         // TileUpdater is called by GLib.IdleHandler, which just calls this "when it has time".
         bool TileUpdater() {
@@ -359,7 +376,6 @@ namespace LynnaLib
                 if (tileImagesCache[tileUpdaterIndex] == null) {
                     numDrawnTiles++;
                     GetTileImage(tileUpdaterIndex); // Will generate the image if it's not cached
-                    TileModifiedEvent?.Invoke(this, tileUpdaterIndex);
                 }
                 tileUpdaterIndex++;
             }
@@ -404,6 +420,8 @@ namespace LynnaLib
             g.Dispose();
 
             tileImagesCache[index] = image;
+
+            TileModifiedEvent?.Invoke(this, index);
             return image;
         }
 
