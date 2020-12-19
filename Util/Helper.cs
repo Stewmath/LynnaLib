@@ -48,13 +48,15 @@ namespace Util {
         }
 
         // Get a sttream of a resource file
-        public static Stream GetResourceStream(string name) {
-            return Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
+        public static Stream GetResourceStream(string name, Assembly assembly = null) {
+            if (assembly == null)
+                assembly = Assembly.GetCallingAssembly();
+            return assembly.GetManifestResourceStream(name);
         }
 
         // Read a resource file
         public static string ReadResourceFile(string name) {
-            return new StreamReader(GetResourceStream(name)).ReadToEnd();
+            return new StreamReader(GetResourceStream(name, Assembly.GetCallingAssembly())).ReadToEnd();
         }
     }
 
