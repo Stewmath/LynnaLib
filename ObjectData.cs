@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
+using Util;
+
 namespace LynnaLib {
     public enum ObjectType {
         Condition=0, // TODO: rename
