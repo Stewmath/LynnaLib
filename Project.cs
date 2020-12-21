@@ -55,7 +55,7 @@ namespace LynnaLib
         ProjectConfig config;
 
 
-        public Project(string d)
+        public Project(string d, string gameToLoad = "")
         {
             baseDirectory = d + '/';
             configDirectory = baseDirectory + "LynnaLab/";
@@ -86,6 +86,9 @@ namespace LynnaLib
                 log.Warn("Couldn't open config file '" + configFile + "'.");
                 config = new ProjectConfig();
             }
+
+            if (gameToLoad != "")
+                config.EditingGame = gameToLoad;
 
 
             // Before parsing anything, create the "ROM_AGES" or "ROM_SEASONS" definition for ifdefs

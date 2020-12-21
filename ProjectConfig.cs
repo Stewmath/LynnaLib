@@ -13,7 +13,7 @@ namespace LynnaLib
 
 
         // Variables imported from YAML config file
-        public string EditingGame { get; private set; }
+        public string EditingGame { get; set; }
         public bool ExpandedTilesets { get; private set; }
     }
 }

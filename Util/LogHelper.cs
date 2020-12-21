@@ -15,6 +15,12 @@ namespace Util
         }
 
 
+        /// Returns a logger using the type of the caller's class.
+        public static log4net.ILog GetLogger() {
+            var callingMethod = (new System.Diagnostics.StackTrace()).GetFrame(1).GetMethod();
+            return log4net.LogManager.GetLogger(callingMethod.DeclaringType);
+        }
+
         public static void AddAppenderToRootLogger(log4net.Appender.IAppender a) {
             ((log4net.Repository.Hierarchy.Hierarchy)LogManager.GetRepository(Assembly.GetEntryAssembly())).Root.AddAppender(a);
         }
