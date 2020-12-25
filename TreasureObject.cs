@@ -49,6 +49,19 @@ namespace LynnaLib
             get; private set;
         }
 
+        // Allows one to get/set the raw value of the 1st byte directly (spawn mode, grab mode, "set
+        // item obtained" bit) instead of using the ValueReferenceGroup.
+        public byte CollectByte {
+            get {
+                return (byte)baseData.GetIntValue(0);
+            }
+            set {
+                // Bypassing the ValueReferenceGroup shouldn't cause any problems with its modified
+                // handler since we're not using AbstractIntValueReference.
+                baseData.SetByteValue(0, value);
+            }
+        }
+
 
         Project Project { get { return treasureGroup.Project; } }
 
