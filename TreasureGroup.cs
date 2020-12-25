@@ -27,7 +27,7 @@ namespace LynnaLib
                 if (!UsesPointer)
                     return 1;
                 try {
-                    data = Project.GetData(data.NextData.GetValue(0));
+                    data = Project.GetData(data.GetValue(0));
                 }
                 catch (InvalidLookupException) {
                     return 0;
@@ -37,7 +37,7 @@ namespace LynnaLib
         }
 
         bool UsesPointer {
-            get { return (dataStart.GetIntValue(0) & 0x80) != 0; }
+            get { return dataStart.CommandLowerCase == "m_treasurepointer"; }
         }
 
 
@@ -57,10 +57,28 @@ namespace LynnaLib
             if (NumTreasureObjectSubids >= 256)
                 return null;
 
+            Func<int, bool, string> ConstructTreasureSubidString = (subid, inSubidTable) => {
+                string prefix = string.Format("/* ${0:x2} */ ", Index);
+                string body = string.Format("$00, $00, $ff, $00, TREASURE_OBJECT_{0}_{1:x2}",
+                        Project.TreasureMapping.ByteToString(Index).Substring(9),
+                        subid);
+                if (inSubidTable)
+                    return "\tm_TreasureSubid " + body;
+                else
+                    return "\t" + prefix + "m_TreasureSubid   " + body;
+            };
+
             if (NumTreasureObjectSubids == 0) {
-                // This should only happen when the treasure has "using a pointer" marked, but is
-                // not using a pointer. So just unset that bit.
-                dataStart.SetByteValue(0, 0);
+                // This should only happen when the treasure is using "m_treasurepointer", but has
+                // a null pointer. So rewrite that line with a blank treasure.
+                dataStart.FileParser.InsertParseableTextAfter(dataStart, new string[] {
+                    ConstructTreasureSubidString(0, false)
+                });
+                dataStart.Detach();
+
+                // Update dataStart (since the old data was deleted)
+                DetermineDataStart();
+
                 return GetTreasureObject(0);
             }
 
@@ -68,31 +86,33 @@ namespace LynnaLib
                 // We need to create a pointer for the subid list and move the old data to the start
                 // of the list. Be careful to ensure that the old data objects are moved, and not
                 // deleted, so that we don't break the TreasureObject's that were built on them.
-                var componentList = new List<FileComponent>();
-                Data data = dataStart;
-                if (TraverseSubidData(ref data, 1, (c) => componentList.Add(c)) != 1)
-                    return null;
-
                 // Create pointer
                 FileParser parser = dataStart.FileParser;
                 string labelName = Project.GetUniqueLabelName(
                         string.Format("treasureObjectData{0:x2}", Index));
-                parser.InsertParseableTextBefore(dataStart, new string[] {
-                    "\t.db $80",
-                    "\t.dw " + labelName,
-                    "\t.db $00"
+                parser.InsertParseableTextBefore(dataStart, new string[] { string.Format(
+                    "\t/* ${0:x2} */ m_TreasurePointer {1}", Index, labelName)
                 });
 
-                // Detach old data
-                foreach (var c in componentList)
-                    c.Detach();
+                dataStart.Detach();
 
                 // Create label
                 parser.InsertParseableTextAfter(null, new string[] { labelName + ":" });
 
+                // Create "m_BeginTreasureSubids" macro
+                parser.InsertParseableTextAfter(null, new string[] { string.Format(
+                            "\tm_BeginTreasureSubids " + Project.TreasureMapping.ByteToString(Index))
+                });
+
                 // Move old data to after the label
-                foreach (var c in componentList)
-                    parser.InsertComponentAfter(null, c);
+                parser.InsertComponentAfter(null, dataStart);
+
+                // Adjust spacing since it's a bit different in the subid table
+                dataStart.SetSpacing(0, "\t");
+                dataStart.SetSpacing(1, "");
+
+                // Insert newline after the new subid table
+                parser.InsertParseableTextAfter(null, new string[] { "" });
 
                 // Update dataStart (since the old data was moved)
                 DetermineDataStart();
@@ -100,12 +120,11 @@ namespace LynnaLib
 
 
             // Pointer either existed already or was just created. Insert new subid's data.
-            Data lastSubidData = Project.GetData(dataStart.NextData.GetValue(0));
+            Data lastSubidData = Project.GetData(dataStart.GetValue(0));
             TraverseSubidData(ref lastSubidData, NumTreasureObjectSubids - 1);
-            lastSubidData = lastSubidData.NextData.NextData.NextData;
 
             dataStart.FileParser.InsertParseableTextAfter(lastSubidData,
-                    new string[] { "\t.db $00 $00 $00 $00" });
+                    new string[] { ConstructTreasureSubidString(NumTreasureObjectSubids, true) });
             return GetTreasureObject(NumTreasureObjectSubids - 1);
         }
 
@@ -123,7 +142,7 @@ namespace LynnaLib
             // Uses pointer
 
             try {
-                data = Project.GetData(data.NextData.GetValue(0)); // Follow pointer
+                data = Project.GetData(data.GetValue(0)); // Follow pointer
             }
             catch (InvalidLookupException) {
                 // Sometimes there is no pointer even when the "pointer" bit is set.
@@ -142,20 +161,11 @@ namespace LynnaLib
             int count = 0;
             while (count < subid) {
                 FileComponent com = data;
-                for (int j=0; j<4;) {
-                    if (action != null)
-                        action(com);
-                    if (com is Data) {
-                        if ((com as Data).Size == -1)
-                            return count;
-                        j += (com as Data).Size;
-                        if (j > 4)
-                            return count;
-                    }
-                    else if (com is Label || com == null)
-                        return count;
-                    com = com.Next;
-                }
+                if (action != null)
+                    action(com);
+                if (com is Label || com == null)
+                    return count;
+                com = com.Next;
                 data = com as Data;
                 count++;
             }
@@ -163,7 +173,7 @@ namespace LynnaLib
         }
 
         void DetermineDataStart() {
-            dataStart = Project.GetData("treasureObjectData", Index*4);
+            dataStart = Project.GetData("treasureObjectData", Index * 4);
         }
     }
 }

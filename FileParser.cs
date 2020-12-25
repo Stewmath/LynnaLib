@@ -7,9 +7,33 @@ using Util;
 
 namespace LynnaLib
 {
+    struct Command {
+        public string name;
+        public int minParams;
+        public int maxParams;
+        public int size;
+
+        public Command(string name, int minParams, int maxParams = -1, int size = -1) {
+            this.name = name;
+            this.minParams = minParams;
+            if (maxParams == -1)
+                this.maxParams = minParams;
+            else
+                this.maxParams = maxParams;
+            this.size = size;
+        }
+    }
+
     public class FileParser
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+
+        // List of commands thas should be interpreted as "Data" instances (not all are listed here)
+        readonly IReadOnlyList<Command> genericCommandList = new List<Command> {
+            new Command("m_treasurepointer", 1, size: 4),
+            new Command("m_treasuresubid", 5, size: 4)
+        };
 
         private Project _project;
 
@@ -345,58 +369,72 @@ arbitraryLengthData:
                     break;
                 }
 
-                default:
-                    {
-                        Data d = null;
-                        // Try object commands
-                        for (int j=0; j<ObjectData.ObjectCommands.Length; j++) {
-                            string s = ObjectData.ObjectCommands[j];
+                default: {
+                    Data d = null;
 
-                            if (s.ToLower() == fTokens[0].ToLower()) {
-                                int minParams = ObjectData.ObjectCommandMinParams[j];
-                                int maxParams = ObjectData.ObjectCommandMaxParams[j];
-
-                                if (minParams == -1) minParams = maxParams;
-                                if (maxParams == -1) maxParams = minParams;
-                                if (fTokens.Count-1 < minParams || fTokens.Count-1 > maxParams) {
-                                    log.Warn(warningString + "Expected " + fTokens[0] + " to take " +
-                                            minParams + "-" + maxParams + "parameter(s)");
-                                    break;
-                                }
-
-                                int objectDefinitionType = j;
-
-                                ObjectData lastObjectData = null;
-                                for (var node = fileStructure.Last; node != null; node = node.Previous) {
-                                    if (node.Value is Data) {
-                                        lastObjectData = node.Value as ObjectData;
-                                        break;
-                                    }
-                                }
-                                d = new ObjectData(Project, fTokens[0], standardValues,
-                                        this, fSpacing, objectDefinitionType, lastObjectData);
+                    // Try generic command list
+                    foreach (Command command in genericCommandList) {
+                        if (command.name.ToLower() == fTokens[0].ToLower())  {
+                            if (fTokens.Count-1 < command.minParams || fTokens.Count-1 > command.maxParams) {
+                                log.Warn(warningString + "Expected " + fTokens[0] + " to take " +
+                                        command.minParams + "-" + command.maxParams + "parameter(s)");
                                 break;
                             }
-                        }
-                        // Try warp sources
-                        foreach (string s in WarpSourceData.WarpCommands) {
-                            if (s.ToLower() == fTokens[0].ToLower()) {
-                                d = new WarpSourceData(Project, fTokens[0], standardValues,
-                                        this, fSpacing);
-                            }
-                        }
-                        // Try warp dest
-                        if (WarpDestData.WarpCommand.ToLower() == fTokens[0].ToLower()) {
-                            d = new WarpDestData(Project, fTokens[0], standardValues,
-                                    this, fSpacing);
-                        }
 
-                        if (d != null) {
-                            AddDataAndPopFileStructure(d);
+                            d = new Data(Project, fTokens[0], standardValues, command.size, this, fSpacing);
                             break;
                         }
-                        return false;
                     }
+
+                    // Try object commands
+                    for (int j=0; j<ObjectData.ObjectCommands.Length; j++) {
+                        string s = ObjectData.ObjectCommands[j];
+
+                        if (s.ToLower() == fTokens[0].ToLower()) {
+                            int minParams = ObjectData.ObjectCommandMinParams[j];
+                            int maxParams = ObjectData.ObjectCommandMaxParams[j];
+
+                            if (minParams == -1) minParams = maxParams;
+                            if (maxParams == -1) maxParams = minParams;
+                            if (fTokens.Count-1 < minParams || fTokens.Count-1 > maxParams) {
+                                log.Warn(warningString + "Expected " + fTokens[0] + " to take " +
+                                        minParams + "-" + maxParams + "parameter(s)");
+                                break;
+                            }
+
+                            int objectDefinitionType = j;
+
+                            ObjectData lastObjectData = null;
+                            for (var node = fileStructure.Last; node != null; node = node.Previous) {
+                                if (node.Value is Data) {
+                                    lastObjectData = node.Value as ObjectData;
+                                    break;
+                                }
+                            }
+                            d = new ObjectData(Project, fTokens[0], standardValues,
+                                    this, fSpacing, objectDefinitionType, lastObjectData);
+                            break;
+                        }
+                    }
+                    // Try warp sources
+                    foreach (string s in WarpSourceData.WarpCommands) {
+                        if (s.ToLower() == fTokens[0].ToLower()) {
+                            d = new WarpSourceData(Project, fTokens[0], standardValues,
+                                    this, fSpacing);
+                        }
+                    }
+                    // Try warp dest
+                    if (WarpDestData.WarpCommand.ToLower() == fTokens[0].ToLower()) {
+                        d = new WarpDestData(Project, fTokens[0], standardValues,
+                                this, fSpacing);
+                    }
+
+                    if (d != null) {
+                        AddDataAndPopFileStructure(d);
+                        break;
+                    }
+                    return false;
+                }
                 }
                 return true;
             };
