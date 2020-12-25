@@ -148,7 +148,7 @@ namespace LynnaLib
                 // Sometimes there is no pointer even when the "pointer" bit is set.
                 return null;
             }
-            if (TraverseSubidData(ref data, subid) != subid)
+            if (TraverseSubidData(ref data, subid) != subid+1)
                 return null;
 
             return data;
@@ -159,15 +159,18 @@ namespace LynnaLib
         /// Labels are considered to end a sequence of subid data.
         int TraverseSubidData(ref Data data, int subid, Action<FileComponent> action = null) {
             int count = 0;
-            while (count < subid) {
-                FileComponent com = data;
+            FileComponent com = data;
+            while (count <= subid) {
+                while (!(com is Data)) {
+                    if (com is Label || com == null)
+                        return count;
+                    com = com.Next;
+                }
                 if (action != null)
                     action(com);
-                if (com is Label || com == null)
-                    return count;
-                com = com.Next;
-                data = com as Data;
                 count++;
+                data = com as Data;
+                com = com.Next;
             }
             return count;
         }
