@@ -298,23 +298,9 @@ namespace LynnaLib
             string pointerString = chestPointer.GetValue(0);
             Data chestGroupData = Project.GetData(pointerString);
 
-            Data newData = new Data(Project, ".db", new string[] {"$00"}, -1, null, new List<string>{"\t"});
-            newData.EndsLine = false;
-            chestFileParser.InsertComponentBefore(chestGroupData, newData);
-
-            newData = new Data(Project, ".db", new string[] {Wla.ToByte((byte)room)}, -1, null, null);
-            newData.PrintCommand = false;
-            newData.EndsLine = false;
-            chestFileParser.InsertComponentBefore(chestGroupData, newData);
-
-            newData = new Data(Project, ".db", new string[] {"$00"}, -1, null, null);
-            newData.PrintCommand = false;
-            newData.EndsLine = false;
-            chestFileParser.InsertComponentBefore(chestGroupData, newData);
-
-            newData = new Data(Project, ".db", new string[] {"$00"}, -1, null, null);
-            newData.PrintCommand = false;
-            chestFileParser.InsertComponentBefore(chestGroupData, newData);
+            chestFileParser.InsertParseableTextBefore(chestGroupData, new string[] {
+                string.Format("\tm_ChestData $00, ${0:x2}, $0000", Index)
+            });
 
             InitializeChest();
 
@@ -565,11 +551,10 @@ namespace LynnaLib
             string pointerString = chestPointer.GetValue(0);
             Data chestGroupData = Project.GetData(pointerString);
 
-            while (chestGroupData.GetIntValue(0) != 0xff) {
-                if (chestGroupData.NextData.GetIntValue(0) == room)
+            while (chestGroupData.Command == "m_ChestData") {
+                if (chestGroupData.GetIntValue(1) == room)
                     return chestGroupData;
-                for (int i=0;i<4;i++)
-                    chestGroupData = chestGroupData.NextData;
+                chestGroupData = chestGroupData.NextData;
             }
 
             return null;

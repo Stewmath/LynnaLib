@@ -29,11 +29,15 @@ namespace LynnaLib
         string command;
         List<string> values;
 
-        // Event called whenever data is modified
+        // Event invoked whenever data is modified
         LockableEvent<DataModifiedEventArgs> dataModifiedEvent = new LockableEvent<DataModifiedEventArgs>();
 
         // TODO: replace above with this
         public event EventHandler<DataModifiedEventArgs> ModifiedEvent;
+
+        // Event invoked when the "GetString" method is invoked (before it does anything) allowing
+        // last-minute adjustments to the data
+        public event EventHandler<EventArgs> ResolveEvent;
 
 
         // Properties
@@ -168,6 +172,8 @@ namespace LynnaLib
         }
 
         public override string GetString() {
+            ResolveEvent?.Invoke(this, null);
+
             string s = "";
             if (PrintCommand)
                 s = GetSpacingIndex(0) + Command;

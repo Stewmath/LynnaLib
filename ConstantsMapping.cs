@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Util;
 
@@ -26,6 +27,10 @@ public class ConstantsMapping
         }
     }
 
+
+    static log4net.ILog log = LogHelper.GetLogger();
+
+
     // This list is only necessary to preserve ordering
     List<string> stringList = new List<string>();
 
@@ -33,18 +38,16 @@ public class ConstantsMapping
     Dictionary<string,Entry> stringToByte = new Dictionary<string,Entry>();
     Dictionary<int,Entry> byteToString = new Dictionary<int,Entry>();
 
-    string[] prefixes;
-
-    FileParser parser;
+    IList<string> prefixes;
 
     private Documentation _documentation;
 
+    int maxValue;
 
-    public Project Project {
-        get { return parser.Project; }
-    }
 
-    public string[] Prefixes {
+    public Project Project { get; private set; }
+
+    public IList<string> Prefixes {
         get { return prefixes; }
     }
 
@@ -65,18 +68,26 @@ public class ConstantsMapping
         : this(parser, new string[] { prefix }, maxValue, alphabetical) {}
 
     public ConstantsMapping(FileParser _parser, string[] _prefixes, int maxValue = -1, bool alphabetical = false)
+        : this(_parser.Project,
+                _parser.DefinesDictionary.ToDictionary(kp => kp.Key, kp => kp.Value.Item1),
+                _prefixes,
+                maxValue,
+                alphabetical,
+                _parser.DefinesDictionary.ToDictionary(kp => kp.Key, kp => kp.Value.Item2)
+                ) {}
+
+    public ConstantsMapping(Project p,
+            Dictionary<string, string> definesDictionary,
+            string[] _prefixes,
+            int maxValue = -1,
+            bool alphabetical = false,
+            Dictionary<string, DocumentationFileComponent> documentationDictionary = null)
+        : this(p, _prefixes, maxValue)
     {
-        this.parser = _parser;
-        this.prefixes = _prefixes;
-
-        if (maxValue == -1)
-            maxValue = Int32.MaxValue;
-
-        Dictionary<string,Tuple<string,DocumentationFileComponent>> definesDictionary = parser.DefinesDictionary;
         foreach (string key in definesDictionary.Keys) {
             bool acceptable = false;
             foreach (string prefix in prefixes) {
-                if (key.Substring(0, prefix.Length) == prefix) {
+                if (key.Length > prefix.Length && key.Substring(0, prefix.Length) == prefix) {
                     acceptable = true;
                     break;
                 }
@@ -85,26 +96,13 @@ public class ConstantsMapping
             if (acceptable) {
                 if (!stringToByte.ContainsKey(key)) {
                     try {
-                        var tup = definesDictionary[key];
-                        string valStr = tup.Item1;
-                        var docComponent = tup.Item2; // May be null
+                        string valStr = definesDictionary[key];
+                        DocumentationFileComponent docComponent = null;
+                        documentationDictionary?.TryGetValue(key, out docComponent);
 
                         int val = Project.EvalToInt(valStr);
 
-                        if (val >= maxValue)
-                            continue;
-                        if (byteToString.ContainsKey(val))
-                            continue;
-
-                        stringList.Add(key);
-
-                        Documentation doc = null;
-                        if (docComponent != null)
-                            doc = new Documentation(docComponent, key);
-                        Entry ent = new Entry(key, val, doc); // TODO: remove doc from here
-
-                        stringToByte[key] = ent;
-                        byteToString[val] = ent;
+                        AddKeyValuePair(key, val, docComponent);
                     }
                     catch (FormatException) {}
                 }
@@ -113,6 +111,37 @@ public class ConstantsMapping
             if (alphabetical)
                 stringList.Sort();
         }
+    }
+
+    public ConstantsMapping(Project p, IList<string> prefixes, int maxValue = -1) {
+        this.Project = p;
+        this.prefixes = prefixes;
+
+        if (maxValue == -1)
+            maxValue = Int32.MaxValue;
+        this.maxValue = maxValue;
+    }
+
+    public void AddKeyValuePair(string key, int value, DocumentationFileComponent docComponent = null) {
+        if (value >= maxValue)
+            return;
+        if (byteToString.ContainsKey(value)) {
+            log.Warn(string.Format("ConstantsMapping already contained value ${0:x}", value));
+            return;
+        }
+        if (stringToByte.ContainsKey(key)) {
+            log.Warn(string.Format("Overwriting key {0} in ConstantsMapping", key));
+        }
+
+        stringList.Add(key);
+
+        Documentation doc = null;
+        if (docComponent != null)
+            doc = new Documentation(docComponent, key);
+        Entry ent = new Entry(key, value, doc); // TODO: remove doc from here
+
+        stringToByte[key] = ent;
+        byteToString[value] = ent;
     }
 
     // May throw KeyNotFoundException

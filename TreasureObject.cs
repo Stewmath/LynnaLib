@@ -23,6 +23,12 @@ namespace LynnaLib
 
             this.baseData = baseData;
             GenerateValueReferenceGroup();
+
+            // Add the treasure definition to the Project's definition list and to the
+            // TreasureObjectMapping.
+            string key = baseData.GetValue(4);
+            Project.AddDefinition(key, Wla.ToWord((ID << 8) | SubID));
+            Project.TreasureObjectMapping.AddKeyValuePair(key, (ID << 8) | SubID);
         }
 
 

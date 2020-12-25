@@ -28,6 +28,7 @@ namespace LynnaLib
         public readonly ConstantsMapping TreasureMapping;
         public readonly ConstantsMapping TreasureSpawnModeMapping;
         public readonly ConstantsMapping TreasureGrabModeMapping;
+        public readonly ConstantsMapping TreasureObjectMapping;
 
         log4net.Appender.RollingFileAppender logAppender;
 
@@ -190,6 +191,17 @@ namespace LynnaLib
                     string filename = "objects/" + GameString + "/" + basename;
                     GetFileParser(filename);
                 }
+            }
+
+            // Load all Treasure Objects. This is necessary because they contain definitions which
+            // are used elsewhere. Can't rely on "lazy loading".
+            // Ideally this would happen automatically in the FileParser, but this is simpler for
+            // now.
+            TreasureObjectMapping = new ConstantsMapping(this, new string[] { "TREASURE_OBJECT_" });
+            for (int t = 0; t < NumTreasures; t++) {
+                TreasureGroup g = GetIndexedDataType<TreasureGroup>(t);
+                for (int s = 0; s < g.NumTreasureObjectSubids; s++)
+                    g.GetTreasureObject(s);
             }
         }
 
