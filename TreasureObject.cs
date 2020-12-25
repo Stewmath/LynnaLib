@@ -26,9 +26,8 @@ namespace LynnaLib
 
             // Add the treasure definition to the Project's definition list and to the
             // TreasureObjectMapping.
-            string key = baseData.GetValue(4);
-            Project.AddDefinition(key, Wla.ToWord((ID << 8) | SubID));
-            Project.TreasureObjectMapping.AddKeyValuePair(key, (ID << 8) | SubID);
+            Project.AddDefinition(Name, Wla.ToWord((ID << 8) | SubID));
+            Project.TreasureObjectMapping.AddKeyValuePair(Name, (ID << 8) | SubID);
         }
 
 
@@ -47,6 +46,10 @@ namespace LynnaLib
         }
         public int SubID {
             get; private set;
+        }
+
+        public string Name {
+            get { return baseData.GetValue(4); }
         }
 
         // Allows one to get/set the raw value of the 1st byte directly (spawn mode, grab mode, "set
