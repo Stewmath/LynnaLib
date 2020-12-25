@@ -45,7 +45,7 @@ namespace LynnaLib
 
         // Maps a string (key) to a pair (v,d), where v is the value, and d is
         // a DocumentationFileComponent (possible null).
-        public Dictionary<string,Tuple<string,DocumentationFileComponent>> definesDictionary =
+        Dictionary<string,Tuple<string,DocumentationFileComponent>> definesDictionary =
             new Dictionary<string,Tuple<string,DocumentationFileComponent>>();
 
         // Objects may be raw strings, or Data structures.
@@ -557,7 +557,7 @@ arbitraryLengthData:
                             value += " ";
                         }
                         value = value.Trim();
-                        AddDefinition(tokens[1], value);
+                        AddDefinitionWhileParsing(tokens[1], value);
                         break;
                     }
 
@@ -610,9 +610,9 @@ arbitraryLengthData:
 
                         FileComponent addedComponent;
                         if (context == "RAMSECTION" || context == "ENUM") {
-                            AddDefinition(s, address.ToString());
+                            AddDefinitionWhileParsing(s, address.ToString());
                             if (context == "RAMSECTION")
-                                AddDefinition(":"+s, bank.ToString());
+                                AddDefinitionWhileParsing(":"+s, bank.ToString());
                             PopFileStructure();
                             StringFileComponent sc = new StringFileComponent(this, tokens[0], spacing);
                             AddComponent(sc);
@@ -657,13 +657,20 @@ arbitraryLengthData:
         ///  Adds something to the definesDictionary. Expects that we're adding something on the
         ///  most recent line; it checks the previous line for a DocumentationFileComponent.
         /// </summary>
-        void AddDefinition(string def, string value) {
-            Project.AddDefinition(def, value);
+        void AddDefinitionWhileParsing(string def, string value) {
+            AddDefinition(def, value);
 
             DocumentationFileComponent doc = null;
             if (fileStructure.Count >= 2)
                 doc = fileStructure.Last.Previous.Value as DocumentationFileComponent;
+
+            // Replace the value from the "AddDefinition" call
             definesDictionary[def] = new Tuple<string,DocumentationFileComponent>(value, doc);
+        }
+
+        void AddDefinition(string def, string value, bool replace = false) {
+            Project.AddDefinition(def, value, replace);
+            definesDictionary[def] = new Tuple<string,DocumentationFileComponent>(value, null);
         }
 
         void AddLabelToDictionaries(Label label) {
@@ -970,6 +977,21 @@ arbitraryLengthData:
                 spacing.Add(line.Substring(spacingStartPos));
 
             return new Tuple<List<string>,List<string>>(tokens,spacing);
+        }
+
+
+        // This method only works on EXISTING constants in a specific file defined with ".define".
+        // No other methods of defining constants will work.
+        public void SetDefinition(string constant, string value) {
+            foreach (StringFileComponent com in fileStructure) {
+                (var tokens, var spacing) = Tokenize(com.GetString());
+                if (tokens.Count >= 2 && tokens[0].ToLower() == ".define" && tokens[1] == constant) {
+                    com.SetString(tokens[0] + spacing[1] + constant + spacing[2] + value);
+                    AddDefinition(constant, value, replace: true);
+                    return;
+                }
+            }
+            throw new ProjectErrorException("SetDefinition: Constant \"" + constant + "\" didn't exist already.");
         }
     }
 }

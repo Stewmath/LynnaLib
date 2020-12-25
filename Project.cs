@@ -448,9 +448,11 @@ namespace LynnaLib
             dataStructDictionary[s] = data;
         }
 
-        public void AddDefinition(string name, string value) {
+        // Adds a definition to definesDictionary. Don't confuse with the "SetDefinition" method.
+        public void AddDefinition(string name, string value, bool replace = false) {
             if (definesDictionary.ContainsKey(name)) {
-                log.Warn("\"" + name + "\" defined multiple times");
+                if (!replace)
+                    log.Warn("\"" + name + "\" defined multiple times");
             }
             definesDictionary[name] = value;
         }
@@ -713,6 +715,15 @@ namespace LynnaLib
             }
             else
                 throw new Exception();
+        }
+
+        // This method only works on EXISTING constants in a specific file defined with ".define".
+        // Unlike the "AddDefinition" method, this modifies a file with a new value.
+        // TODO: Update the ConstantsMappings somehow. (Should overhaul those and use the
+        // "Project.AddDefinition" method for updating constants, or something.)
+        public void SetDefinition(string filename, string constant, string value) {
+            FileParser parser = fileParserDictionary[filename];
+            parser.SetDefinition(constant, value);
         }
 
 

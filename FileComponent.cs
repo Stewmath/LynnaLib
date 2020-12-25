@@ -112,6 +112,11 @@ namespace LynnaLib
         public override string GetString() {
             return spacing[0] + str + spacing[1];
         }
+
+        public void SetString(string s) {
+            str = s;
+            Modified = true;
+        }
     }
 
     public class Label : FileComponent {
