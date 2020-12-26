@@ -97,12 +97,7 @@ namespace LynnaLib
             definesDictionary.Add("ROM_"+GameString.ToUpper(), "");
 
             // Parse everything in constants/
-            foreach (string f in Helper.GetSortedFiles(baseDirectory + "constants/")) {
-                if (f.Substring(f.LastIndexOf('.')) == ".s") {
-                    string filename = "constants/" + f.Substring(f.LastIndexOf('/') + 1);
-                    GetFileParser(filename);
-                }
-            }
+            LoadFilesRecursively("constants/");
 
             // Initialize constantsMappings
             UniqueGfxMapping = new ConstantsMapping(
@@ -164,34 +159,13 @@ namespace LynnaLib
                 GetFileParser("data/" + GameString + "/tilesetHeaders.s");
             }
             GetFileParser("data/" + GameString + "/paletteData.s");
-            foreach (string f in Helper.GetSortedFiles(baseDirectory + "data/")) {
-                if (f.Substring(f.LastIndexOf('.')) == ".s") {
-                    string filename = "data/" + f.Substring(f.LastIndexOf('/') + 1);
-                    GetFileParser(filename);
-                }
-            }
-            // Parse data/{game}/
-            string gameSpecificDataFolder = "data/" + GameString + "/";
-            foreach (string f in Helper.GetSortedFiles(baseDirectory + gameSpecificDataFolder)) {
-                if (f.Substring(f.LastIndexOf('.')) == ".s") {
-                    string filename = gameSpecificDataFolder + f.Substring(f.LastIndexOf('/') + 1);
-                    GetFileParser(filename);
-                }
-            }
+            LoadFilesRecursively("data/");
 
             // Parse wram.s
             GetFileParser("include/wram.s");
+
             // Parse everything in objects/
-            foreach (string f in Helper.GetSortedFiles(baseDirectory + "objects/" + GameString + "/")) {
-
-                string basename = f.Substring(f.LastIndexOf('/') + 1);
-                if (basename == "macros.s") continue; // LynnaLib doesn't understand macros
-
-                if (f.Substring(f.LastIndexOf('.')) == ".s") {
-                    string filename = "objects/" + GameString + "/" + basename;
-                    GetFileParser(filename);
-                }
-            }
+            LoadFilesRecursively("objects/" + GameString + "/");
 
             // Load all Treasure Objects. This is necessary because they contain definitions which
             // are used elsewhere. Can't rely on "lazy loading".
@@ -202,6 +176,28 @@ namespace LynnaLib
                 TreasureGroup g = GetIndexedDataType<TreasureGroup>(t);
                 for (int s = 0; s < g.NumTreasureObjectSubids; s++)
                     g.GetTreasureObject(s);
+            }
+        }
+
+        void LoadFilesRecursively(string directory) {
+            if (!directory.EndsWith("/"))
+                directory += "/";
+            foreach (string f in Helper.GetSortedFiles(baseDirectory + directory)) {
+                if (f.Substring(f.LastIndexOf('.')) == ".s") {
+                    string basename = f.Substring(f.LastIndexOf('/') + 1);
+                    if (basename == "macros.s") continue; // LynnaLib doesn't understand macros
+
+                    string filename = directory + basename;
+                    GetFileParser(filename);
+                }
+            }
+
+            // Ignore folders that belong to the other game
+            string ignoreDirectory = (GameString == "ages" ? "seasons" : "ages");
+            foreach (string d in Helper.GetSortedDirectories(baseDirectory + directory)) {
+                if (d == ignoreDirectory)
+                    continue;
+                LoadFilesRecursively(directory + d);
             }
         }
 

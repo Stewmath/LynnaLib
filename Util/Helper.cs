@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Linq;
 
 namespace Util {
 
@@ -45,6 +46,14 @@ namespace Util {
             List<string> files = new List<string>(Directory.GetFiles(dir));
             files.Sort();
             return files;
+        }
+
+        // Like Directory.GetDirectories(), but guaranteed to be sorted, and it doesn't return the
+        // full path of the directory.
+        public static IList<string> GetSortedDirectories(string dir) {
+            List<string> files = new List<string>(Directory.GetDirectories(dir));
+            files.Sort();
+            return new List<string>(files.Select((x) => x.Substring(x.LastIndexOf("/") + 1)));
         }
 
         // Get a sttream of a resource file
