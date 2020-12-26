@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Util;
 
 namespace LynnaLib
@@ -96,23 +97,28 @@ namespace LynnaLib
 
                 dataStart.Detach();
 
+                // We want to insert the data at the end of the file, but it must be within the
+                // section, so we need to check for the ".ends" directive and put it above there.
+                var sectionEnd = parser.FileComponents.Where((x) => x.GetString().Trim().ToLower() == ".ends");
+                FileComponent insertPos = (sectionEnd.Count() == 0 ? null : sectionEnd.Last().Prev);
+
                 // Create label
-                parser.InsertParseableTextAfter(null, new string[] { labelName + ":" });
+                insertPos = parser.InsertParseableTextAfter(insertPos, new string[] { labelName + ":" });
 
                 // Create "m_BeginTreasureSubids" macro
-                parser.InsertParseableTextAfter(null, new string[] { string.Format(
+                insertPos = parser.InsertParseableTextAfter(insertPos, new string[] { string.Format(
                             "\tm_BeginTreasureSubids " + Project.TreasureMapping.ByteToString(Index))
                 });
 
                 // Move old data to after the label
-                parser.InsertComponentAfter(null, dataStart);
+                insertPos = parser.InsertComponentAfter(insertPos, dataStart);
 
                 // Adjust spacing since it's a bit different in the subid table
                 dataStart.SetSpacing(0, "\t");
                 dataStart.SetSpacing(1, "");
 
                 // Insert newline after the new subid table
-                parser.InsertParseableTextAfter(null, new string[] { "" });
+                insertPos = parser.InsertParseableTextAfter(insertPos, new string[] { "" });
 
                 // Update dataStart (since the old data was moved)
                 DetermineDataStart();

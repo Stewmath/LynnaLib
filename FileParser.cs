@@ -84,6 +84,32 @@ namespace LynnaLib
 
 
 
+        public FileParser(Project p, string f) {
+            _project = p;
+            this.filename = f;
+            this.fullFilename = Project.BaseDirectory + f;
+
+
+            log.Info("Began parsing \"" + Filename + "\".");
+
+
+            string[] lines = File.ReadAllLines(FullFilename);
+
+            for (int i=0; i<lines.Length; i++) {
+                currentLine = i;
+                ParseLine(lines[i], fileStructure);
+            }
+
+            context = "";
+
+            Modified = false;
+
+            log.Info("Finished parsing \"" + Filename + "\".");
+        }
+
+
+        // Properties
+
         public bool Modified {get; set;}
         public Project Project {
             get { return _project; }
@@ -116,28 +142,12 @@ namespace LynnaLib
             get { return definesDictionary; }
         }
 
-        public FileParser(Project p, string f) {
-            _project = p;
-            this.filename = f;
-            this.fullFilename = Project.BaseDirectory + f;
-
-
-            log.Info("Began parsing \"" + Filename + "\".");
-
-
-            string[] lines = File.ReadAllLines(FullFilename);
-
-            for (int i=0; i<lines.Length; i++) {
-                currentLine = i;
-                ParseLine(lines[i], fileStructure);
-            }
-
-            context = "";
-
-            Modified = false;
-
-            log.Info("Finished parsing \"" + Filename + "\".");
+        public IEnumerable<FileComponent> FileComponents {
+            get { return fileStructure; }
         }
+
+
+        // Methods
 
         void ParseLine(string pureLine, DictionaryLinkedList<FileComponent> fileStructure) {
             string warningString = WarningString;
@@ -727,7 +737,7 @@ arbitraryLengthData:
 
         // Attempt to insert newComponent after refComponent, or at the end if
         // refComponent is null.
-        public void InsertComponentAfter(FileComponent refComponent, FileComponent newComponent) {
+        public FileComponent InsertComponentAfter(FileComponent refComponent, FileComponent newComponent) {
             if (refComponent == null)
                 fileStructure.AddLast(newComponent);
             else {
@@ -742,10 +752,11 @@ arbitraryLengthData:
             if (newComponent is Label)
                 AddLabelToDictionaries(newComponent as Label);
             Modified = true;
+            return newComponent;
         }
 
         // Insert at the beginning if refComponent is null.
-        public void InsertComponentBefore(FileComponent refComponent, FileComponent newComponent) {
+        public FileComponent InsertComponentBefore(FileComponent refComponent, FileComponent newComponent) {
             if (refComponent == null)
                 fileStructure.AddFirst(newComponent);
             else {
@@ -758,11 +769,12 @@ arbitraryLengthData:
             if (newComponent is Label)
                 AddLabelToDictionaries(newComponent as Label);
             Modified = true;
+            return newComponent;
         }
 
-        // Parse an array of text (each element is a line) and insert it after
-        // refComponent (or at the end if refComponent is null);
-        public void InsertParseableTextAfter(FileComponent refComponent, string[] text) {
+        // Parse an array of text (each element is a line) and insert it after refComponent (or at
+        // the end if refComponent is null). Returns the final inserted FileComponent.
+        public FileComponent InsertParseableTextAfter(FileComponent refComponent, string[] text) {
             context = "";
             var structure = new DictionaryLinkedList<FileComponent>();
 
@@ -782,8 +794,9 @@ arbitraryLengthData:
             }
 
             Modified = true;
+            return structure.Last.Value;
         }
-        public void InsertParseableTextBefore(FileComponent refComponent, string[] text) {
+        public FileComponent InsertParseableTextBefore(FileComponent refComponent, string[] text) {
             context = "";
             var structure = new DictionaryLinkedList<FileComponent>();
 
@@ -803,6 +816,7 @@ arbitraryLengthData:
             }
 
             Modified = true;
+            return structure.First.Value;
         }
 
         public FileComponent GetNextFileComponent(FileComponent reference) {
