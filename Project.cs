@@ -149,7 +149,7 @@ namespace LynnaLib
                     "TREASURE_SPAWN_MODE_");
             TreasureGrabModeMapping = new ConstantsMapping(
                     GetFileParser("constants/treasureSpawnModes.s"),
-                    "TREASURE_COLLECT_MODE_");
+                    "TREASURE_GRAB_MODE_");
 
             // Parse everything in data/
             // A few files need to be loaded before others through
