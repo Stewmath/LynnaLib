@@ -35,7 +35,9 @@ namespace LynnaLib
         int[] roomsUsed;
 
 
-        internal Dungeon(Project p, int i) : base(p, i) {
+        internal Dungeon(Project p, int i) : base(p) {
+            this.Index = i;
+
             FileParser dungeonDataFile = Project.GetFileWithLabel("dungeonDataTable");
             Data pointerData = dungeonDataFile.GetData("dungeonDataTable", Index*2);
             string label = pointerData.GetValue(0);
@@ -91,14 +93,21 @@ namespace LynnaLib
         }
         public override int RoomWidth {
             get {
-                return GetRoom(0,0).Width;
+                return GetRoom(0,0).GetLayout(-1).Width;
             }
         }
         public override int RoomHeight {
             get {
-                return GetRoom(0,0).Height;
+                return GetRoom(0,0).GetLayout(-1).Height;
             }
         }
+        public override int Season {
+            get { return -1; }
+        }
+
+        // Other properties
+
+        public int Index { get; private set; }
 
 
         public void SetRoom(int x, int y, int floor, int room) {
@@ -139,7 +148,7 @@ namespace LynnaLib
             // Change the group if the room is sidescrolling. As a result, the group number of
             // sidescrolling rooms in a dungeon will be different from other rooms, which will look
             // weird, but that's the way it works apparently...
-            if (room.Tileset.SidescrollFlag)
+            if (room.GetTileset(-1).SidescrollFlag)
                 room = Project.GetIndexedDataType<Room>(roomIndex + SidescrollGroup*0x100);
 
             return room;

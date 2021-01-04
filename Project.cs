@@ -23,6 +23,7 @@ namespace LynnaLib
         public readonly ConstantsMapping EnemyMapping;
         public readonly ConstantsMapping PartMapping;
         public readonly ConstantsMapping ItemMapping;
+        public readonly ConstantsMapping SeasonMapping;
         public readonly ConstantsMapping SpecialObjectMapping;
         public readonly ConstantsMapping ItemDropMapping;
         public readonly ConstantsMapping TreasureMapping;
@@ -134,6 +135,9 @@ namespace LynnaLib
                     GetFileParser("constants/itemTypes.s"),
                     "ITEMID_",
                     alphabetical: true);
+            SeasonMapping = new ConstantsMapping(
+                    GetFileParser("constants/seasons.s"),
+                    "SEASON_");
             SpecialObjectMapping = new ConstantsMapping(
                     GetFileParser("constants/specialObjectTypes.s"),
                     "SPECIALOBJECTID_");
@@ -217,6 +221,10 @@ namespace LynnaLib
         // The string to use for navigating game-specific folders in the disassembly
         public string GameString {
             get { return Config.EditingGame; }
+        }
+
+        public Game Game {
+            get { return GameString == "ages" ? Game.Ages : Game.Seasons; }
         }
 
         public int NumDungeons {
@@ -407,6 +415,43 @@ namespace LynnaLib
             AddDataType(o);
 
             return o as T;
+        }
+
+
+        Dictionary<Tuple<int,int>,Tileset> tilesetCache = new Dictionary<Tuple<int,int>,Tileset>();
+        Dictionary<int,Dungeon> dungeonCache = new Dictionary<int,Dungeon>();
+        Dictionary<Tuple<int,int>,WorldMap> worldMapCache = new Dictionary<Tuple<int,int>,WorldMap>();
+
+        public Tileset GetTileset(int index, int season) {
+            if (season == -1) // No seasons expected
+                season = 0;
+            Tileset retval;
+            tilesetCache.TryGetValue(new Tuple<int,int>(index, season), out retval);
+            if (retval == null) {
+                retval = new Tileset(this, index, season);
+                tilesetCache[new Tuple<int,int>(index, season)] = retval;
+            }
+            return retval;
+        }
+
+        public Dungeon GetDungeon(int index) {
+            Dungeon retval;
+            dungeonCache.TryGetValue(index, out retval);
+            if (retval == null) {
+                retval = new Dungeon(this, index);
+                dungeonCache[index] = retval;
+            }
+            return retval;
+        }
+
+        public WorldMap GetWorldMap(int index, int season) {
+            WorldMap retval;
+            worldMapCache.TryGetValue(new Tuple<int,int>(index,season), out retval);
+            if (retval == null) {
+                retval = new WorldMap(this, index, season);
+                worldMapCache[new Tuple<int,int>(index,season)] = retval;
+            }
+            return retval;
         }
 
         /// <summary>
@@ -627,7 +672,7 @@ namespace LynnaLib
             var rooms = new HashSet<int>();
 
             for (int i=0; i<NumDungeons; i++) {
-                Dungeon d = GetIndexedDataType<Dungeon>(i);
+                Dungeon d = GetDungeon(i);
                 if (d.RoomUsed(roomIndex))
                     return true;
             }
@@ -665,7 +710,7 @@ namespace LynnaLib
             floor = -1;
 
             for (int d=0; d<NumDungeons; d++) {
-                Dungeon dungeon = GetIndexedDataType<Dungeon>(d);
+                Dungeon dungeon = GetDungeon(d);
                 if (dungeon.GetRoomPosition(room, out x, out y, out floor))
                     return dungeon;
             }
@@ -728,5 +773,10 @@ namespace LynnaLib
         bool FileExists(string filename) {
             return File.Exists(BaseDirectory + filename);
         }
+    }
+
+    public enum Game {
+        Seasons = 0,
+        Ages
     }
 }

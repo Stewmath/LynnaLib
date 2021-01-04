@@ -7,7 +7,7 @@ using Util;
 
 namespace LynnaLib
 {
-    public class Tileset : ProjectIndexedDataType
+    public class Tileset
     {
         FileParser tilesetFile;
         Data tilesetData;
@@ -50,6 +50,10 @@ namespace LynnaLib
 
 
         // Properties
+
+        public Project Project { get; private set; }
+        public int Index { get; private set; }
+        public int Season { get; private set; } // Tilesets with the same index but different season differ
 
         // The GraphicsState which contains the data as it will be loaded into
         // vram.
@@ -121,7 +125,11 @@ namespace LynnaLib
             }
         }
 
-        internal Tileset(Project p, int i) : base(p, i) {
+        internal Tileset(Project p, int i, int season) {
+            Project = p;
+            Index = i;
+            Season = season;
+
             tilesetFile = Project.GetFileWithLabel("tilesetData");
 
             tilesetData = tilesetFile.GetData("tilesetData", Index * 8);
@@ -130,7 +138,6 @@ namespace LynnaLib
             // If this is Seasons, it's possible that tilesetData does not point to 8 bytes as
             // expected, but instead to an "m_SeasonalData" macro.
             if (tilesetData.CommandLowerCase == "m_seasonaltileset") {
-                int season=0; // TODO: season switching
                 tilesetData = Project.GetData(tilesetData.GetValue(0), season*8);
             }
 
@@ -588,9 +595,6 @@ namespace LynnaLib
 
         public ValueReferenceGroup GetValueReferenceGroup() {
             return vrg;
-        }
-
-        public override void Save() {
         }
 
         void LoadMainGfx() {

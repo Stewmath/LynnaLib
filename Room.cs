@@ -6,43 +6,41 @@ using Util;
 
 namespace LynnaLib
 {
-    /// Provides an interface for modifying layout and keeping track of changes
-    /// to the image.
-    /// Can also use this to modify various room properties, or to get related
-    /// classes, ie. relating to warps or objects.
+    /// Provides an interface for accessing various room properties, or to get related classes, ie.
+    /// relating to room layout variants, warps or objects.
     public partial class Room : ProjectIndexedDataType {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
 
-        // Actual width and height of room (note that width can differ from Stride, below)
-        int width, height;
-
-        MemoryFileStream tileDataFile;
         MemoryFileStream dungeonFlagStream;
 
-        Tileset loadedTileset;
-        Bitmap cachedImage;
+        // Different season layouts
+        List<RoomLayout> layouts;
 
-
-        public delegate void RoomModifiedHandler();
-        // Event invoked when the room's image is modified in any way
-        public event RoomModifiedHandler RoomModifiedEvent;
 
         // Event invoked upon adding a chest. For removing a chest, use the event in the Chest
         // class.
         public event EventHandler<EventArgs> ChestAddedEvent;
 
 
-        internal Room(Project p, int i) : base(p,i) {
+        internal Room(Project p, int index) : base(p, index) {
             // Get dungeon flag file
             Data data = Project.GetData("dungeonRoomPropertiesGroupTable", (Group % 2) * 2);
             data = Project.GetData(data.GetValue(0));
             dungeonFlagStream = Project.GetBinaryFile("rooms/" + Project.GameString + "/" + data.GetValue(0));
 
             GenerateValueReferenceGroup();
-
-            UpdateTileset();
             InitializeChest();
+
+            layouts = new List<RoomLayout>();
+            if (Project.Game == Game.Seasons && Group == 0) {
+                for (int i = 0; i < 4; i++) {
+                    layouts.Add(new RoomLayout(this, i));
+                }
+            }
+            else
+                layouts.Add(new RoomLayout(this, 0));
+            UpdateTileset();
         }
 
 
@@ -62,7 +60,7 @@ namespace LynnaLib
                         return Group;
                     else if (Group < 8) {
                         int g = 4 + (Group % 2);
-                        if (Tileset.SidescrollFlag)
+                        if (GetTileset(0).SidescrollFlag)
                             return g + 2;
                         else
                             return g;
@@ -77,7 +75,7 @@ namespace LynnaLib
                         return Group; // TODO: subrosia, maku tree, and indoor rooms have different values
                     else if (Group < 8) {
                         int g = 4 + (Group % 2);
-                        if (Tileset.SidescrollFlag)
+                        if (GetTileset(0).SidescrollFlag)
                             return g + 2;
                         else
                             return g;
@@ -94,23 +92,13 @@ namespace LynnaLib
             get { return ExpectedGroup << 8 | (Index & 0xff); }
         }
 
-        public int Height
-        {
-            get { return height; }
+        public int Width { get { return GetLayout(0).Width; } }
+        public int Height { get { return GetLayout(0).Height; } }
+
+        public bool HasSeasons {
+            get { return layouts.Count == 4; }
         }
-        public int Width
-        {
-            get { return width; }
-        }
-        public Tileset Tileset
-        {
-            get {
-                return Project.GetIndexedDataType<Tileset>(ValueReferenceGroup.GetIntValue("Tileset"));
-            }
-            set {
-                ValueReferenceGroup.SetValue("Tileset", value.Index);
-            }
-        }
+
         public Chest Chest { get; private set; }
 
         /// If true, tileset graphics are loaded after the screen transition instead of before.
@@ -118,6 +106,15 @@ namespace LynnaLib
         public bool GfxLoadAfterTransition {
             get {
                 return (GetTilesetByte() & 0x80) != 0;
+            }
+        }
+
+        public int TilesetIndex {
+            get {
+                return ValueReferenceGroup.GetIntValue("Tileset");
+            }
+            set {
+                ValueReferenceGroup.SetValue("Tileset", value);
             }
         }
 
@@ -205,14 +202,6 @@ namespace LynnaLib
         /// Alternative interface for accessing certain properties
         public ValueReferenceGroup ValueReferenceGroup { get; private set; }
 
-
-        /// # of bytes per row (including unused bytes; this means it has a value of 16 for large
-        /// rooms, which is 1 higher than the width, which is 15).
-        int Stride {
-            get { return width == 10 ? 10 : 16; }
-
-        }
-
         /// Whether a room pack value exists or not (only exists for the main overworld groups)
         bool HasRoomPack {
             get {
@@ -221,34 +210,26 @@ namespace LynnaLib
         }
 
 
-        public Bitmap GetImage() {
-            if (cachedImage != null)
-                return cachedImage;
-
-            cachedImage = new Bitmap(width*16, height*16);
-            Graphics g = Graphics.FromImage(cachedImage);
-
-            for (int x=0; x<width; x++) {
-                for (int y=0; y<height; y++) {
-                    g.DrawImageUnscaled(Tileset.GetTileImage(GetTile(x,y)), x*16, y*16);
-                }
+        /// Gets a RoomLayout object corresponding to the season. Pass -1 if seasons are not
+        /// expected to exist.
+        public RoomLayout GetLayout(int season) {
+            if (season == -1) {
+                if (layouts.Count != 1)
+                    throw new ProjectErrorException(string.Format(
+                                "Room {0:x3} wasn't expected to have seasons.", Index));
+                season = 0;
             }
-
-            g.Dispose();
-
-            return cachedImage;
+            return layouts[season];
         }
 
-        public int GetTile(int x, int y) {
-            tileDataFile.Position = y*Stride+x;
-            return tileDataFile.ReadByte();
-        }
-        public void SetTile(int x, int y, int value) {
-            if (GetTile(x,y) != value) {
-                tileDataFile.Position = y*Stride+x;
-                tileDataFile.WriteByte((byte)value);
-                // Modifying the data will trigger the callback to the TileDataModified function
+        public Tileset GetTileset(int season) {
+            if (season == -1) {
+                if (layouts.Count != 1)
+                    throw new ProjectErrorException(string.Format(
+                                "Room {0:x3} wasn't expected to have seasons.", Index));
+                season = 0;
             }
+            return Project.GetTileset(TilesetIndex, season);
         }
 
         // These 2 functions may be deprecated later if I switch to using
@@ -272,11 +253,6 @@ namespace LynnaLib
 
         public WarpGroup GetWarpGroup() {
             return Project.GetIndexedDataType<WarpGroup>(Index);
-        }
-
-        /// Returns true if the rooms are equal, or if they share duplicate room layout data.
-        public bool EqualsOrDuplicate(Room room) {
-            return tileDataFile == room.tileDataFile;
         }
 
 
@@ -322,21 +298,8 @@ namespace LynnaLib
         // Private methods
 
         void UpdateTileset() {
-            if (loadedTileset != Tileset) {
-                if (loadedTileset != null) {
-                    loadedTileset.TileModifiedEvent -= ModifiedTilesetCallback;
-                    loadedTileset.LayoutGroupModifiedEvent -= ModifiedLayoutGroupCallback;
-                }
-                Tileset.TileModifiedEvent += ModifiedTilesetCallback;
-                Tileset.LayoutGroupModifiedEvent += ModifiedLayoutGroupCallback;
-
-                cachedImage = null;
-                loadedTileset = Tileset;
-
-                UpdateRoomData();
-                if (RoomModifiedEvent != null)
-                    RoomModifiedEvent();
-            }
+            foreach (var layout in layouts)
+                layout.UpdateTileset();
         }
 
         // Returns a stream for the tileset mapping file (256 bytes, one byte per room)
@@ -380,98 +343,6 @@ namespace LynnaLib
                     return null;
             }
             return Project.GetBinaryFile(s);
-        }
-
-        void UpdateRoomData() {
-            if (tileDataFile != null) {
-                tileDataFile.RemoveModifiedEventHandler(TileDataModified);
-                tileDataFile = null;
-            }
-            // Get the tileDataFile
-            int layoutGroup = Tileset.LayoutGroup;
-            string label = "room" + ((layoutGroup<<8)+(Index&0xff)).ToString("X4").ToLower();
-            FileParser parserFile = Project.GetFileWithLabel(label);
-            Data data = parserFile.GetData(label);
-            if (data.CommandLowerCase != "m_roomlayoutdata") {
-                throw new AssemblyErrorException("Expected label \"" + label + "\" to be followed by the m_RoomLayoutData macro.");
-            }
-            string roomString = data.GetValue(0) + ".bin";
-            try {
-                tileDataFile = Project.GetBinaryFile(
-                        "rooms/" + Project.GameString + "/small/" + roomString);
-            }
-            catch (FileNotFoundException) {
-                try {
-                    tileDataFile = Project.GetBinaryFile(
-                            "rooms/" + Project.GameString + "/large/" + roomString);
-                }
-                catch (FileNotFoundException) {
-                    throw new AssemblyErrorException("Couldn't find \"" + roomString + "\" in \"rooms/small\" or \"rooms/large\".");
-                }
-            }
-
-            tileDataFile.AddModifiedEventHandler(TileDataModified);
-
-            if (tileDataFile.Length == 80) { // Small map
-                width = 10;
-                height = 8;
-            }
-            else if (tileDataFile.Length == 176) { // Large map
-                width = 0xf;
-                height = 0xb;
-            }
-            else
-                throw new AssemblyErrorException("Size of file \"" + tileDataFile.Name + "\" was invalid!");
-        }
-
-        // Room layout modified
-        void TileDataModified(object sender, MemoryFileStream.ModifiedEventArgs args) {
-            if (cachedImage != null) {
-                Graphics g = Graphics.FromImage(cachedImage);
-
-                for (long i=args.modifiedRangeStart; i<args.modifiedRangeEnd; i++) {
-                    int x = (int)(i % Stride);
-                    int y = (int)(i / Stride);
-                    if (x >= Width)
-                        continue;
-                    g.DrawImageUnscaled(Tileset.GetTileImage(GetTile(x, y)), x*16, y*16);
-                }
-                g.Dispose();
-            }
-            Modified = true;
-            if (RoomModifiedEvent != null)
-                RoomModifiedEvent();
-        }
-
-        // Tileset modified
-        void ModifiedTilesetCallback(object sender, int tile) {
-            Graphics g = null;
-            if (cachedImage != null)
-                g = Graphics.FromImage(cachedImage);
-
-            bool changed = false;
-            for (int x=0; x<Width; x++) {
-                for (int y=0; y<Height; y++) {
-                    if (GetTile(x, y) == tile) {
-                        if (cachedImage != null)
-                            g.DrawImageUnscaled(Tileset.GetTileImage(GetTile(x,y)), x*16, y*16);
-                        changed = true;
-                    }
-                }
-            }
-
-            if (g != null)
-                g.Dispose();
-
-            if (changed && RoomModifiedEvent != null)
-                RoomModifiedEvent();
-        }
-
-        void ModifiedLayoutGroupCallback() {
-            UpdateRoomData();
-            cachedImage = null;
-            if (RoomModifiedEvent != null)
-                RoomModifiedEvent();
         }
 
         bool GetDungeonFlagBit(int bit) {

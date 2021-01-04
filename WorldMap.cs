@@ -6,12 +6,22 @@ namespace LynnaLib
 {
     public class WorldMap : Map
     {
+        int group, season;
+
+        internal WorldMap(Project p, int group, int season) : base(p)
+        {
+            this.group = group;
+            this.season = season;
+        }
+
+
         // Map properties
         public override int MainGroup {
             get {
-                return Index;
+                return group;
             }
         }
+
         public override int MapWidth {
             get {
                 return 16;
@@ -24,26 +34,24 @@ namespace LynnaLib
         }
         public override int RoomWidth {
             get {
-                return GetRoom(0,0).Width;
+                return GetRoom(0, 0).Width;
             }
         }
         public override int RoomHeight {
             get {
-                return GetRoom(0,0).Height;
+                return GetRoom(0, 0).Height;
             }
         }
+        public override int Season { get { return season; } }
 
-        internal WorldMap(Project p, int i) : base(p, i)
-        {
-        }
 
         // Map methods
 
         public override Room GetRoom(int x, int y, int floor=0) {
-            return Project.GetIndexedDataType<Room>(Index*0x100+x+y*16);
+            return Project.GetIndexedDataType<Room>(group*0x100+x+y*16);
         }
         public override bool GetRoomPosition(Room room, out int x, out int y, out int floor) {
-            if (room.Index/0x100 != Index) {
+            if (room.Index/0x100 != group) {
                 // Not in this group
                 x = -1;
                 y = -1;
