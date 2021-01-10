@@ -515,10 +515,12 @@ arbitraryLengthData:
                 // Built-in directives
                 case ".ramsection": {
                     context = "RAMSECTION";
-                    // Find the last token which specifies the name
+                    // Find the last token which specifies the name (if wrapped in quotation marks)
                     int tokenIndex = 1;
-                    while (tokens[tokenIndex][tokens[tokenIndex].Length-1] != '"')
-                        tokenIndex++;
+                    if (tokens[tokenIndex].Contains("\"")) {
+                        while (tokens[tokenIndex][tokens[tokenIndex].Length-1] != '"')
+                            tokenIndex++;
+                    }
                     tokenIndex++;
 
                     while (tokenIndex < tokens.Count) {
@@ -536,6 +538,9 @@ arbitraryLengthData:
                                 address = 0xd000;
                             }
                         }
+                        else
+                            throw new AssemblyErrorException(warningString
+                                    + "Couldn't understand " + tokens[tokenIndex] + ".");
                     }
                     break;
                 }
