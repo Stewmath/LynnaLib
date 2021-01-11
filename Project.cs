@@ -445,6 +445,8 @@ namespace LynnaLib
         }
 
         public WorldMap GetWorldMap(int index, int season) {
+            if (Game == Game.Ages || index != 0)
+                season = -1;
             WorldMap retval;
             worldMapCache.TryGetValue(new Tuple<int,int>(index,season), out retval);
             if (retval == null) {
